@@ -12,6 +12,7 @@ import type {
   TUIAgent,
   TUIAgentUIMessagePart,
   TUIAgentUIMessage,
+  TUIAgentUIToolPart,
 } from "./types.js";
 
 type AppProps = {
@@ -23,7 +24,7 @@ type AppProps = {
 const TextPart = memo(function TextPart({ text }: { text: string }) {
   return (
     <Box>
-      <Text>● </Text>
+      <Text>●{" "}</Text>
       <Text wrap="wrap">{text}</Text>
     </Box>
   );
@@ -41,8 +42,7 @@ const ReasoningPart = memo(function ReasoningPart({ text }: { text: string }) {
 });
 
 // Tool wrapper - not memoized to allow spinner animations
-function ToolPartWrapper({ part }: { part: TUIAgentUIMessagePart }) {
-  if (!isToolUIPart(part)) return null;
+function ToolPartWrapper({ part }: { part: TUIAgentUIToolPart }) {
   return <ToolCall part={part} />;
 }
 

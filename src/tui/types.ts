@@ -1,4 +1,4 @@
-import type { InferAgentUIMessage, InferUITools, ToolLoopAgent } from "ai";
+import type { DynamicToolUIPart, InferAgentUIMessage, InferUITools, ToolLoopAgent, ToolUIPart } from "ai";
 import type { DeepAgent } from "../agent/deep-agent";
 
 // update here!
@@ -11,6 +11,7 @@ export type TUIAgentUIMessage = InferAgentUIMessage<TUIAgent>;
 export type TUIAgentUIMessagePart = TUIAgentUIMessage["parts"][number];
 export type TUIAgentTools = TUIAgent["tools"];
 export type TUIAgentUITools = InferUITools<TUIAgentTools>;
+export type TUIAgentUIToolPart = DynamicToolUIPart | ToolUIPart<TUIAgentUITools>;
 
 /* --- */
 export type AutoAcceptMode = "off" | "edits" | "all";
