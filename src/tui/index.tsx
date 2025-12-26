@@ -26,7 +26,7 @@ export type { TUIOptions, AutoAcceptMode } from "./types.js";
  */
 export async function createTUI(
   agent: TUIAgent,
-  options?: TUIOptions
+  options: TUIOptions
 ): Promise<void> {
   const { waitUntilExit } = render(
     <App agent={agent} options={options} />
@@ -41,7 +41,7 @@ export async function createTUI(
  */
 export function renderTUI(
   agent: TUIAgent,
-  options?: TUIOptions
+  options: TUIOptions
 ) {
   return render(<App agent={agent} options={options} />);
 }

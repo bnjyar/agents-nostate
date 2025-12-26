@@ -40,6 +40,11 @@ async function main() {
         todos: [],
         scratchpad: new Map(),
       },
+      header: {
+        name: "Open Claude Code",
+        version: "0.1.0",
+        model: "Claude Haiku",
+      },
     });
   } catch (error) {
     console.error("Error:", error instanceof Error ? error.message : error);

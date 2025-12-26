@@ -7,6 +7,7 @@ import { createAgentTransport } from "./transport.js";
 import { ToolCall } from "./components/tool-call.js";
 import { StatusBar } from "./components/status-bar.js";
 import { InputBox } from "./components/input-box.js";
+import { Header } from "./components/header.js";
 import type {
   TUIOptions,
   AutoAcceptMode,
@@ -295,6 +296,14 @@ export function App({ agent, options }: AppProps) {
 
   return (
     <Box flexDirection="column" paddingLeft={1} paddingRight={1}>
+      {/* Header */}
+      <Header
+        name={options?.header?.name}
+        version={options?.header?.version}
+        model={options?.header?.model}
+        cwd={options?.workingDirectory}
+      />
+
       {/* Render all messages */}
       <MessagesList messages={messages} />
 

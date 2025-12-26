@@ -23,4 +23,10 @@ export type TUIOptions = {
   workingDirectory?: string;
   /** Custom agent options passed  */
   agentOptions: TUIAgentCallOptions;
+  /** Header configuration */
+  header?: {
+    name?: string;
+    version?: string;
+    model?: string;
+  };
 };
