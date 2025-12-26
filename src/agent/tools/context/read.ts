@@ -7,7 +7,8 @@ export const readFileTool = tool({
   description: `Read a file from the filesystem or scratchpad.
 
 USAGE:
-- The path must be an absolute path for filesystem, or start with /scratchpad/ for scratchpad
+- The path must be a FULL absolute path (e.g., /Users/username/project/file.ts), not just /file.ts
+- Paths starting with /scratchpad/ access the scratchpad
 - By default reads up to 2000 lines from the beginning
 - Use offset and limit for long files
 - Results include line numbers starting at 1
@@ -17,7 +18,11 @@ IMPORTANT:
 - You can call multiple Read tools in parallel to speculatively read multiple files
 - For directories, use the glob or bash ls command instead`,
   inputSchema: z.object({
-    filePath: z.string().describe("Absolute path to the file to read"),
+    filePath: z
+      .string()
+      .describe(
+        "Full absolute path to the file (e.g., /Users/username/project/file.ts)",
+      ),
     offset: z
       .number()
       .optional()
@@ -37,9 +42,31 @@ IMPORTANT:
         };
       }
 
-      const absolutePath = path.isAbsolute(filePath)
+      // Resolve the path - handle relative paths and root-relative paths like /README.md
+      let absolutePath = path.isAbsolute(filePath)
         ? filePath
         : path.resolve(filePath);
+
+      // If the path doesn't exist and looks like a root-relative path (e.g., /README.md),
+      // try resolving it relative to the current working directory
+      try {
+        await fs.access(absolutePath);
+      } catch {
+        // Path doesn't exist - check if it's a root-relative path that should be workspace-relative
+        if (
+          filePath.startsWith("/") &&
+          !filePath.startsWith("/Users/") &&
+          !filePath.startsWith("/home/")
+        ) {
+          const workspaceRelativePath = path.join(process.cwd(), filePath);
+          try {
+            await fs.access(workspaceRelativePath);
+            absolutePath = workspaceRelativePath;
+          } catch {
+            // Neither path exists - let it fall through to the original error handling
+          }
+        }
+      }
 
       const stats = await fs.stat(absolutePath);
       if (stats.isDirectory()) {
@@ -56,7 +83,7 @@ IMPORTANT:
       const selectedLines = lines.slice(startLine, endLine);
 
       const numberedLines = selectedLines.map(
-        (line, i) => `${startLine + i + 1}: ${line}`
+        (line, i) => `${startLine + i + 1}: ${line}`,
       );
 
       return {
