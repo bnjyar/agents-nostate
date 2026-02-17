@@ -1,7 +1,9 @@
 import { sleep } from "workflow";
-import { getSessionById } from "@/lib/db/sessions";
+import { getSessionById, updateSession } from "@/lib/db/sessions";
+import { SANDBOX_LIFECYCLE_MIN_SLEEP_MS } from "@/lib/sandbox/config";
 import {
   evaluateSandboxLifecycle,
+  getLifecycleDueAtMs,
   type SandboxLifecycleEvaluationResult,
   type SandboxLifecycleReason,
 } from "@/lib/sandbox/lifecycle";
@@ -13,8 +15,30 @@ interface LifecycleWakeDecision {
   reason?: string;
 }
 
+async function claimLifecycleLease(
+  sessionId: string,
+  runId: string,
+): Promise<boolean> {
+  const current = await getSessionById(sessionId);
+  if (!current) {
+    return false;
+  }
+
+  if (current.lifecycleRunId && current.lifecycleRunId !== runId) {
+    return false;
+  }
+
+  if (current.lifecycleRunId !== runId) {
+    await updateSession(sessionId, { lifecycleRunId: runId });
+  }
+
+  const verified = await getSessionById(sessionId);
+  return verified?.lifecycleRunId === runId;
+}
+
 async function computeLifecycleWakeDecision(
   sessionId: string,
+  runId: string,
 ): Promise<LifecycleWakeDecision> {
   "use step";
 
@@ -30,14 +54,13 @@ async function computeLifecycleWakeDecision(
   if (!canOperateOnSandbox(state) || state.type === "just-bash") {
     return { shouldContinue: false, reason: "sandbox-not-operable" };
   }
-
-  if (!session.hibernateAfter) {
-    return { shouldContinue: false, reason: "missing-hibernate-after" };
+  if (!(await claimLifecycleLease(sessionId, runId))) {
+    return { shouldContinue: false, reason: "run-replaced" };
   }
 
   return {
     shouldContinue: true,
-    wakeAtMs: session.hibernateAfter.getTime(),
+    wakeAtMs: getLifecycleDueAtMs(session),
   };
 }
 
@@ -49,44 +72,50 @@ async function runLifecycleEvaluation(
   return evaluateSandboxLifecycle(sessionId, reason);
 }
 
+async function clearLifecycleRunIdIfOwned(
+  sessionId: string,
+  runId: string,
+): Promise<void> {
+  "use step";
+
+  const session = await getSessionById(sessionId);
+  if (!session || session.lifecycleRunId !== runId) {
+    return;
+  }
+
+  await updateSession(sessionId, { lifecycleRunId: null });
+}
+
 export async function sandboxLifecycleWorkflow(
   sessionId: string,
   reason: SandboxLifecycleReason,
+  runId: string,
 ) {
   "use workflow";
-
-  const decision = await computeLifecycleWakeDecision(sessionId);
-  if (!decision.shouldContinue || decision.wakeAtMs === undefined) {
-    return { skipped: true, reason: decision.reason ?? "no-decision" };
-  }
-
-  const now = Date.now();
-  if (decision.wakeAtMs > now) {
-    await sleep(new Date(decision.wakeAtMs));
-  }
-
-  const evaluation = await runLifecycleEvaluation(sessionId, reason);
-
-  // If the evaluation skipped because activity happened during the sleep,
-  // re-compute the next wake time and try once more. Without this retry,
-  // the sandbox would never hibernate until a new event kicks a fresh workflow.
-  if (evaluation.action === "skipped" && evaluation.reason === "not-due-yet") {
-    const retryDecision = await computeLifecycleWakeDecision(sessionId);
-    if (!retryDecision.shouldContinue || retryDecision.wakeAtMs === undefined) {
-      return {
-        skipped: true,
-        reason: retryDecision.reason ?? "no-decision-on-retry",
-      };
+  while (true) {
+    const decision = await computeLifecycleWakeDecision(sessionId, runId);
+    if (!decision.shouldContinue || decision.wakeAtMs === undefined) {
+      await clearLifecycleRunIdIfOwned(sessionId, runId);
+      return { skipped: true, reason: decision.reason ?? "no-decision" };
     }
 
-    const retryNow = Date.now();
-    if (retryDecision.wakeAtMs > retryNow) {
-      await sleep(new Date(retryDecision.wakeAtMs));
+    const now = Date.now();
+    const wakeAtMs = Math.max(
+      decision.wakeAtMs,
+      now + SANDBOX_LIFECYCLE_MIN_SLEEP_MS,
+    );
+    await sleep(new Date(wakeAtMs));
+
+    const evaluation = await runLifecycleEvaluation(sessionId, reason);
+
+    if (
+      evaluation.action === "skipped" &&
+      evaluation.reason === "not-due-yet"
+    ) {
+      continue;
     }
 
-    const retryEvaluation = await runLifecycleEvaluation(sessionId, reason);
-    return { skipped: false, evaluation: retryEvaluation };
+    await clearLifecycleRunIdIfOwned(sessionId, runId);
+    return { skipped: false, evaluation };
   }
-
-  return { skipped: false, evaluation };
 }
