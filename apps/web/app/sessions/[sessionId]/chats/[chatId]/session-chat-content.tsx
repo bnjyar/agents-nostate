@@ -915,7 +915,7 @@ export function SessionChatContent() {
 
     if (status === "error") {
       lastStreamRecoveryAtRef.current = now;
-      retryChatStream();
+      retryChatStream({ auto: true });
       return;
     }
 
@@ -929,7 +929,7 @@ export function SessionChatContent() {
     }
 
     lastStreamRecoveryAtRef.current = now;
-    retryChatStream();
+    retryChatStream({ auto: true });
   };
 
   // Stable identity wrapper – safe to use in effect dependency arrays without
@@ -1889,7 +1889,7 @@ export function SessionChatContent() {
             variant="outline"
             size="sm"
             className="shrink-0 gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
-            onClick={retryChatStream}
+            onClick={() => retryChatStream()}
           >
             <RefreshCw className="h-3 w-3" />
             Retry
@@ -2338,6 +2338,7 @@ export function SessionChatContent() {
                         stopChatStream();
                       }}
                       className="h-8 w-8 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      style={{ touchAction: "manipulation" }}
                     >
                       <Square className="h-3 w-3 fill-current" />
                     </Button>
