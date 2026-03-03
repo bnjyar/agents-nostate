@@ -38,6 +38,8 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import useSWR from "swr";
+import type { PrDeploymentResponse } from "@/app/api/sessions/[sessionId]/pr-deployment/route";
 import type {
   WebAgentUIMessage,
   WebAgentUIMessagePart,
@@ -95,6 +97,7 @@ import {
 import { ACCEPT_IMAGE_TYPES, isValidImageType } from "@/lib/image-utils";
 import { DEFAULT_CONTEXT_LIMIT } from "@/lib/models";
 import { DEFAULT_SANDBOX_TIMEOUT_MS } from "@/lib/sandbox/config";
+import { fetcher } from "@/lib/swr";
 import { streamdownPlugins } from "@/lib/streamdown-config";
 import { cn } from "@/lib/utils";
 import {
@@ -2065,6 +2068,28 @@ export function SessionChatContent(_props: unknown) {
 
   const hasRepo = Boolean(session.cloneUrl);
   const hasExistingPr = session.prNumber != null;
+  const existingPrUrl =
+    hasExistingPr && session.repoOwner && session.repoName
+      ? `https://github.com/${session.repoOwner}/${session.repoName}/pull/${session.prNumber}`
+      : null;
+  const { data: prDeploymentData } = useSWR<PrDeploymentResponse>(
+    hasExistingPr
+      ? `/api/sessions/${session.id}/pr-deployment?prNumber=${session.prNumber}`
+      : null,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      // We stop polling once a deployment URL is found because Vercel preview
+      // URLs are expected to follow the PR branch and keep serving the latest
+      // deployment. If this assumption ever changes, force revalidation after
+      // commits (see onCommitted callback below).
+      refreshInterval: (latestData) =>
+        hasExistingPr && !latestData?.deploymentUrl ? 60_000 : 0,
+      shouldRetryOnError: false,
+    },
+  );
+  const prDeploymentUrl = prDeploymentData?.deploymentUrl ?? null;
   const hasUncommittedGitChanges = gitStatus?.hasUncommittedChanges ?? false;
   const hasUnpushedCommits = gitStatus?.hasUnpushedCommits ?? false;
   const hasBranchDiff =
@@ -2078,16 +2103,20 @@ export function SessionChatContent(_props: unknown) {
     hasRepo &&
     (hasUncommittedGitChanges || (hasExistingPr && hasUnpushedCommits));
   const commitActionLabel = hasExistingPr ? "Commit & Push" : "Commit Changes";
-  const existingPrUrl =
-    hasExistingPr && session.repoOwner && session.repoName
-      ? `https://github.com/${session.repoOwner}/${session.repoName}/pull/${session.prNumber}`
-      : null;
   const openExistingPr = () => {
     if (!existingPrUrl) {
       return;
     }
 
     window.open(existingPrUrl, "_blank", "noopener,noreferrer");
+  };
+  const openPreviewOrPr = () => {
+    const targetUrl = prDeploymentUrl ?? existingPrUrl;
+    if (!targetUrl) {
+      return;
+    }
+
+    window.open(targetUrl, "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -2171,12 +2200,22 @@ export function SessionChatContent(_props: unknown) {
                       variant="outline"
                       size="sm"
                       className="h-8 w-8 px-0 xl:w-auto xl:px-3"
-                      onClick={openExistingPr}
+                      onClick={openPreviewOrPr}
+                      disabled={!prDeploymentUrl && !existingPrUrl}
                     >
-                      <GitPullRequest className="h-4 w-4 xl:mr-2" />
-                      <span className="hidden xl:inline">
-                        View PR #{session.prNumber}
-                      </span>
+                      {prDeploymentUrl ? (
+                        <>
+                          <ExternalLink className="h-4 w-4 xl:mr-2" />
+                          <span className="hidden xl:inline">Preview</span>
+                        </>
+                      ) : (
+                        <>
+                          <GitPullRequest className="h-4 w-4 xl:mr-2" />
+                          <span className="hidden xl:inline">
+                            View PR #{session.prNumber}
+                          </span>
+                        </>
+                      )}
                     </Button>
                   )
                 ) : showCommitAction ? (
@@ -2309,7 +2348,24 @@ export function SessionChatContent(_props: unknown) {
                   {hasRepo ? (
                     hasExistingPr ? (
                       <>
-                        <DropdownMenuItem onClick={openExistingPr}>
+                        {prDeploymentUrl && (
+                          <DropdownMenuItem
+                            onClick={() => {
+                              window.open(
+                                prDeploymentUrl,
+                                "_blank",
+                                "noopener,noreferrer",
+                              );
+                            }}
+                          >
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            Preview
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem
+                          onClick={openExistingPr}
+                          disabled={!existingPrUrl}
+                        >
                           <GitPullRequest className="mr-2 h-4 w-4" />
                           View PR #{session.prNumber}
                         </DropdownMenuItem>
