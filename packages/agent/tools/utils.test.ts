@@ -1,17 +1,32 @@
-import { describe, expect, mock, test } from "bun:test";
-import {
+import { beforeEach, describe, expect, mock, test } from "bun:test";
+
+const connectSandboxCalls: unknown[][] = [];
+
+let connectSandboxResult: unknown = {
+  workingDirectory: "/repo",
+};
+
+mock.module("@open-harness/sandbox", () => ({
+  connectSandbox: async (...args: unknown[]) => {
+    connectSandboxCalls.push(args);
+    return connectSandboxResult;
+  },
+}));
+
+const {
   getSandbox,
   getSandboxContext,
   isPathWithinDirectory,
   shellEscape,
   toDisplayPath,
-} from "./utils";
+} = await import("./utils");
 
-mock.module("@open-harness/sandbox", () => ({
-  connectSandbox: async () => ({
+beforeEach(() => {
+  connectSandboxCalls.length = 0;
+  connectSandboxResult = {
     workingDirectory: "/repo",
-  }),
-}));
+  };
+});
 
 describe("tools/utils", () => {
   test("isPathWithinDirectory handles nested and sibling paths", () => {
@@ -42,11 +57,11 @@ describe("tools/utils", () => {
     expect(context.sandbox.workingDirectory).toBe("/repo");
   });
 
-  test("getSandbox lazily connects from sandbox state", async () => {
+  test("getSandbox connects using the sandbox state from context", async () => {
     const sandbox = await getSandbox(
       {
         sandbox: {
-          state: { type: "vercel" },
+          state: { type: "vercel", sandboxId: "sbx-456" },
           workingDirectory: "/repo",
         },
         model: "test-model",
@@ -55,6 +70,9 @@ describe("tools/utils", () => {
     );
 
     expect(sandbox.workingDirectory).toBe("/repo");
+    expect(connectSandboxCalls).toEqual([
+      [{ type: "vercel", sandboxId: "sbx-456" }],
+    ]);
   });
 
   test("shellEscape safely escapes single quotes", () => {
