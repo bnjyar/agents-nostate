@@ -96,17 +96,7 @@ export async function POST(req: Request) {
       });
     }
 
-    // 3. If session already has a PR recorded for the same branch, just return
-    // current state (the PR was created through our flow -- no need to re-check)
-    if (!branchChanged && sessionRecord.prNumber) {
-      return Response.json({
-        branch,
-        prNumber: sessionRecord.prNumber,
-        prStatus: sessionRecord.prStatus,
-      });
-    }
-
-    // 4. Check GitHub for an existing PR on this branch
+    // 3. Check GitHub for an existing PR on this branch
     let token: string | undefined;
     try {
       const tokenResult = await getRepoToken(
@@ -115,8 +105,12 @@ export async function POST(req: Request) {
       );
       token = tokenResult.token;
     } catch {
-      // No token available -- skip PR check
-      return Response.json({ branch, prNumber: null, prStatus: null });
+      // No token available -- return existing PR info if we have it
+      return Response.json({
+        branch,
+        prNumber: sessionRecord.prNumber ?? null,
+        prStatus: sessionRecord.prStatus ?? null,
+      });
     }
 
     const prResult = await findPullRequestByBranch({
@@ -127,11 +121,17 @@ export async function POST(req: Request) {
     });
 
     if (prResult.found && prResult.prNumber && prResult.prStatus) {
-      // Persist PR info to session
-      await updateSession(sessionId, {
-        prNumber: prResult.prNumber,
-        prStatus: prResult.prStatus,
-      });
+      // Only update DB if PR info actually changed
+      const prChanged =
+        prResult.prNumber !== sessionRecord.prNumber ||
+        prResult.prStatus !== sessionRecord.prStatus;
+
+      if (prChanged) {
+        await updateSession(sessionId, {
+          prNumber: prResult.prNumber,
+          prStatus: prResult.prStatus,
+        });
+      }
 
       return Response.json({
         branch,
