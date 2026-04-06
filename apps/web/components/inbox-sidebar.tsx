@@ -227,7 +227,7 @@ function SessionPopoverContent({ session }: { session: SessionWithUnread }) {
         )}
         {session.branch ? (
           <span className="flex min-w-0 items-center gap-1 ml-1">
-            <GitBranch className="h-3 w-3 shrink-0 text-muted-foreground/40" />
+            <GitBranch className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
             {branchUrl ? (
               <a
                 href={branchUrl}
