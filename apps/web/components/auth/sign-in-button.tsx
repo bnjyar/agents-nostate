@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type ComponentProps } from "react";
-import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 function VercelIcon({ className }: { className?: string }) {
@@ -55,12 +54,8 @@ export function SignInButton({
 
   return (
     <Button {...props} disabled={disabled || isLoading} onClick={handleSignIn}>
-      {isLoading ? (
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-      ) : (
-        <VercelIcon className="mr-2 h-4 w-4" />
-      )}
-      {isLoading ? "Signing in…" : "Sign in with Vercel"}
+      <VercelIcon className="mr-2 h-4 w-4" />
+      Sign in with Vercel
     </Button>
   );
 }
