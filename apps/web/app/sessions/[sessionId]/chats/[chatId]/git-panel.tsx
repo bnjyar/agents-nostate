@@ -79,7 +79,6 @@ type GitPanelProps = {
   hasExistingPr: boolean;
   existingPrUrl: string | null;
   hasUncommittedGitChanges: boolean;
-  canMergeAndArchive: boolean;
   supportsRepoCreation: boolean;
   supportsDiff: boolean;
   hasDiff: boolean;
@@ -1155,7 +1154,6 @@ export function GitPanel(props: GitPanelProps) {
     hasExistingPr,
     existingPrUrl,
     hasUncommittedGitChanges,
-    canMergeAndArchive,
     supportsRepoCreation,
     supportsDiff,
     hasDiff,
@@ -1229,7 +1227,7 @@ export function GitPanel(props: GitPanelProps) {
       </div>
 
       {/* Tab bar — matches chat tabs sub-header height */}
-      <div className="flex items-center gap-0.5 border-b border-border bg-muted/30 px-2 py-1.5">
+      <div className="flex items-center gap-0.5 border-b border-border bg-muted/30 px-2 py-2.5">
         {(
           [
             "code" as const,
@@ -1252,7 +1250,7 @@ export function GitPanel(props: GitPanelProps) {
               ? "Code"
               : tab === "diff"
                 ? "Changes"
-                : "Git"}
+                : "PR"}
             {tab === "diff" && hasDiffChanges && (
               <span className="ml-1 text-[10px] text-muted-foreground font-mono">
                 {diffFiles?.length ?? 0}
@@ -1391,19 +1389,11 @@ export function GitPanel(props: GitPanelProps) {
         {gitPanelTab === "pr" && (
           <div className="p-3">
             {hasExistingPr ? (
-              canMergeAndArchive ? (
-                <InlineMergePanel
-                  session={session}
-                  onMerged={onMerged}
-                  onFixChecks={onFixChecks}
-                />
-              ) : (
-                <div className="text-center text-xs text-muted-foreground py-6">
-                  {hasUncommittedGitChanges
-                    ? "Commit changes before merging"
-                    : "No open PR to merge"}
-                </div>
-              )
+              <InlineMergePanel
+                session={session}
+                onMerged={onMerged}
+                onFixChecks={onFixChecks}
+              />
             ) : hasRepo ? (
               <InlinePrCreatePanel
                 session={session}

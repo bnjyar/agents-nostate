@@ -2679,7 +2679,7 @@ export function SessionChatContent({
       hasExistingPr={hasExistingPr}
       existingPrUrl={existingPrUrl}
       hasUncommittedGitChanges={hasUncommittedGitChanges}
-      canMergeAndArchive={canMergeAndArchive}
+
       supportsRepoCreation={supportsRepoCreation}
       supportsDiff={supportsDiff}
       hasDiff={Boolean(diff || session.cachedDiff)}
