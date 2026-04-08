@@ -33,7 +33,7 @@ function SessionLayoutInner({
   activeChatId: string;
   children: ReactNode;
 }) {
-  const { panelContent } = useGitPanel();
+  const { panelPortalRef } = useGitPanel();
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -48,8 +48,8 @@ function SessionLayoutInner({
         </div>
       </div>
 
-      {/* Right panel — full page height, rendered from per-chat page via context slot */}
-      {panelContent}
+      {/* Portal target for the git panel — full page height */}
+      <div ref={panelPortalRef} className="contents" />
     </div>
   );
 }

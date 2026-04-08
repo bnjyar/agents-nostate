@@ -32,6 +32,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { createPortal } from "react-dom";
 import useSWR from "swr";
 import type { ChatRefreshResponse } from "@/app/api/sessions/[sessionId]/chats/[chatId]/route";
 import type { MergePullRequestResponse } from "@/app/api/sessions/[sessionId]/merge/route";
@@ -878,7 +879,7 @@ export function SessionChatContent({
   const [branchPreviewUrlChangeBaseline, setBranchPreviewUrlChangeBaseline] =
     useState<string | null | undefined>(undefined);
   const hasMounted = useHasMounted();
-  const { activeView, shareRequested, setShareRequested, setPanelContent } = useGitPanel();
+  const { activeView, shareRequested, setShareRequested, panelPortalRef } = useGitPanel();
   const { preferences } = useUserPreferences();
   const isIosDevice = useMemo(() => {
     if (typeof navigator === "undefined") {
@@ -2687,78 +2688,75 @@ export function SessionChatContent({
     [archiveSession, router, updateSessionPullRequest],
   );
 
-  // Register the git panel content into the layout-level slot so it renders
-  // as a full-height sibling of the header/tabs/content column.
-  useEffect(() => {
-    setPanelContent(
-      <GitPanel
-        session={session}
-        hasRepo={hasRepo}
-        hasExistingPr={hasExistingPr}
-        existingPrUrl={existingPrUrl}
-        canCreatePr={canCreatePr}
-        isCreatePrBranchReady={isCreatePrBranchReady}
-        showCommitAction={showCommitAction}
-        commitActionLabel={commitActionLabel}
-        hasUncommittedGitChanges={hasUncommittedGitChanges}
-        canMergeAndArchive={canMergeAndArchive}
-        supportsRepoCreation={supportsRepoCreation}
-        supportsDiff={supportsDiff}
-        hasDiff={Boolean(diff || session.cachedDiff)}
-        isAutoCommitting={isAutoCommitting}
-        isChatReady={isChatReady}
-        prDeploymentUrl={prDeploymentUrl}
-        isDeploymentStale={isDeploymentStale}
-        buildingDeploymentUrl={buildingDeploymentUrl}
-        canRunDevServer={canRunDevServer}
-        devServer={devServer}
-        codeEditor={codeEditor}
-        diffFiles={diff?.files ?? null}
-        diffSummary={diff?.summary ?? null}
-        onCommitClick={() => setCommitDialogOpen(true)}
-        onCreatePrClick={() => setPrDialogOpen(true)}
-        onCreateRepoClick={() => setRepoDialogOpen(true)}
-        onOpenPreview={
-          isDeploymentStale && buildingDeploymentUrl
-            ? openBuildingDeployment
-            : openPreviewOrPr
+  const gitPanelElement = (
+    <GitPanel
+      session={session}
+      hasRepo={hasRepo}
+      hasExistingPr={hasExistingPr}
+      existingPrUrl={existingPrUrl}
+      canCreatePr={canCreatePr}
+      isCreatePrBranchReady={isCreatePrBranchReady}
+      showCommitAction={showCommitAction}
+      commitActionLabel={commitActionLabel}
+      hasUncommittedGitChanges={hasUncommittedGitChanges}
+      canMergeAndArchive={canMergeAndArchive}
+      supportsRepoCreation={supportsRepoCreation}
+      supportsDiff={supportsDiff}
+      hasDiff={Boolean(diff || session.cachedDiff)}
+      isAutoCommitting={isAutoCommitting}
+      isChatReady={isChatReady}
+      prDeploymentUrl={prDeploymentUrl}
+      isDeploymentStale={isDeploymentStale}
+      buildingDeploymentUrl={buildingDeploymentUrl}
+      canRunDevServer={canRunDevServer}
+      devServer={devServer}
+      codeEditor={codeEditor}
+      diffFiles={diff?.files ?? null}
+      diffSummary={diff?.summary ?? null}
+      onCommitClick={() => setCommitDialogOpen(true)}
+      onCreatePrClick={() => setPrDialogOpen(true)}
+      onCreateRepoClick={() => setRepoDialogOpen(true)}
+      onOpenPreview={
+        isDeploymentStale && buildingDeploymentUrl
+          ? openBuildingDeployment
+          : openPreviewOrPr
+      }
+      onOpenPr={openExistingPr}
+      onOpenBuildingDeployment={openBuildingDeployment}
+      onMerged={handleMerged}
+      onFixChecks={async (failedRuns) => {
+        let text = "";
+        try {
+          const res = await fetch(
+            `/api/sessions/${session.id}/checks/fix`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ checkRuns: failedRuns }),
+            },
+          );
+          if (res.ok) {
+            const data = (await res.json()) as { message: string };
+            text = data.message;
+          }
+        } catch {
+          // Fall through to fallback
         }
-        onOpenPr={openExistingPr}
-        onOpenBuildingDeployment={openBuildingDeployment}
-        onMerged={handleMerged}
-        onFixChecks={async (failedRuns) => {
-          let text = "";
-          try {
-            const res = await fetch(
-              `/api/sessions/${session.id}/checks/fix`,
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ checkRuns: failedRuns }),
-              },
-            );
-            if (res.ok) {
-              const data = (await res.json()) as { message: string };
-              text = data.message;
-            }
-          } catch {
-            // Fall through to fallback
-          }
 
-          if (!text) {
-            const names = failedRuns.map((r) => r.name).join(", ");
-            text = `# Fix Failing Checks\n\nThe following checks are failing: ${names}. Please investigate and push a fix.`;
-          }
+        if (!text) {
+          const names = failedRuns.map((r) => r.name).join(", ");
+          text = `# Fix Failing Checks\n\nThe following checks are failing: ${names}. Please investigate and push a fix.`;
+        }
 
-          void sendMessageWithPendingState({ text });
-        }}
-      />,
-    );
-    return () => setPanelContent(null);
-  });
+        void sendMessageWithPendingState({ text });
+      }}
+    />
+  );
 
   return (
     <>
+    {/* Git panel portaled to layout-level for full page height */}
+    {panelPortalRef.current && createPortal(gitPanelElement, panelPortalRef.current)}
     <div className="flex h-full flex-col overflow-hidden">
 
       {/* Share dialog (triggered from header) */}

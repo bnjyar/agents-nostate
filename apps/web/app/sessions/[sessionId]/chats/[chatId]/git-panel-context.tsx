@@ -6,7 +6,9 @@ import {
   useContext,
   useState,
   useMemo,
+  useRef,
   type ReactNode,
+  type RefObject,
 } from "react";
 
 export type GitPanelTab = "code" | "diff" | "checks";
@@ -41,9 +43,8 @@ type GitPanelContextValue = {
   shareRequested: boolean;
   setShareRequested: (requested: boolean) => void;
 
-  /** Panel content slot — page renders GitPanel here, layout shell displays it */
-  panelContent: ReactNode;
-  setPanelContent: (content: ReactNode) => void;
+  /** Ref to the DOM node where the git panel should be portaled into */
+  panelPortalRef: RefObject<HTMLDivElement | null>;
 };
 
 const GitPanelContext = createContext<GitPanelContextValue | undefined>(
@@ -57,7 +58,7 @@ export function GitPanelProvider({ children }: { children: ReactNode }) {
   const [focusedDiffFile, setFocusedDiffFile] = useState<string | null>(null);
   const [changesTabDismissed, setChangesTabDismissed] = useState(false);
   const [shareRequested, setShareRequested] = useState(false);
-  const [panelContent, setPanelContent] = useState<ReactNode>(null);
+  const panelPortalRef = useRef<HTMLDivElement | null>(null);
 
   const toggleGitPanel = useCallback(() => {
     setGitPanelOpen((prev) => !prev);
@@ -85,10 +86,9 @@ export function GitPanelProvider({ children }: { children: ReactNode }) {
       openDiffToFile,
       shareRequested,
       setShareRequested,
-      panelContent,
-      setPanelContent,
+      panelPortalRef,
     }),
-    [gitPanelOpen, toggleGitPanel, gitPanelTab, activeView, changesTabDismissed, focusedDiffFile, openDiffToFile, shareRequested, panelContent],
+    [gitPanelOpen, toggleGitPanel, gitPanelTab, activeView, changesTabDismissed, focusedDiffFile, openDiffToFile, shareRequested],
   );
 
   return (
