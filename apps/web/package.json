@@ -15,7 +15,7 @@
     "db:check": "bun run scripts/check-migrations.ts"
   },
   "dependencies": {
-    "@ai-sdk/elevenlabs": "^2.0.26",
+    "@ai-sdk/elevenlabs": "^2.0.29",
     "@ai-sdk/react": "catalog:",
     "@octokit/auth-app": "^8.2.0",
     "@octokit/rest": "^22.0.1",
@@ -61,7 +61,7 @@
     "swr": "^2.3.8",
     "tailwind-merge": "^3.4.0",
     "vaul": "^1.1.2",
-    "workflow": "^4.2.2",
+    "workflow": "^4.2.0-beta.72",
     "zod": "catalog:"
   },
   "devDependencies": {
